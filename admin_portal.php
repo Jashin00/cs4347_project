@@ -7,65 +7,50 @@ if (empty($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
-/**
- * BOOKS: join Book + Publisher + Author
- */
+$success_message = $_SESSION['success_message'] ?? '';
+$error_message = $_SESSION['error_message'] ?? '';
+unset($_SESSION['success_message']);
+unset($_SESSION['error_message']);
+
+// Get counts for dashboard
+$countBooks = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM Book"))['total'];
+$countMembers = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM Member"))['total'];
+$countActiveLoans = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM Loan WHERE return_date IS NULL"))['total'];
+$countOverdue = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM Loan WHERE return_date IS NULL AND due_date < CURDATE()"))['total'];
+
+// Get all publishers for dropdown
+$publishers = mysqli_query($conn, "SELECT p_name FROM Publisher ORDER BY p_name");
+
+// Get all books
 $booksSql = "
     SELECT 
-        b.book_id,
-        b.title,
-        b.isbn,
-        b.genre,
-        b.publication_date,
-        p.p_name AS publisher,
+        b.book_id, b.title, b.isbn, b.genre, b.publication_date, b.p_name AS publisher,
         GROUP_CONCAT(a.a_name SEPARATOR ', ') AS authors
     FROM Book b
-    JOIN Publisher p ON b.p_name = p.p_name
     LEFT JOIN Author a ON a.book_id = b.book_id
     GROUP BY b.book_id
     ORDER BY b.title
 ";
 $booksResult = mysqli_query($conn, $booksSql);
 
-
-/**
- * MEMBERS (Users): from Member table
- */
-$membersSql = "
-    SELECT member_id, fname, lname, email, phone, role, dob
-    FROM Member
-    ORDER BY member_id
-";
-$membersResult = mysqli_query($conn, $membersSql);
-
-/**
- * LOANS: join Loan + Member + LoanItem + Book
- */
-// LOAN MANAGEMENT – list loans with member + books
+// Get all loans
 $loansSql = "
-    SELECT
-        l.loan_id,
-        l.date_out,
-        l.due_date,
-        l.return_date,
+    SELECT l.loan_id, l.date_out, l.due_date, l.return_date,
         CONCAT(m.fname, ' ', m.lname) AS member_name,
         GROUP_CONCAT(DISTINCT b.title ORDER BY b.title SEPARATOR ', ') AS books
     FROM Loan l
-    JOIN Member m     ON l.member_id = m.member_id
+    JOIN Member m ON l.member_id = m.member_id
     LEFT JOIN LoanItem li ON l.loan_id = li.loan_id
-    LEFT JOIN Book b      ON li.book_id = b.book_id
-    GROUP BY
-        l.loan_id,
-        l.date_out,
-        l.due_date,
-        l.return_date,
-        m.fname,
-        m.lname
+    LEFT JOIN Book b ON li.book_id = b.book_id
+    GROUP BY l.loan_id
     ORDER BY l.date_out DESC
 ";
 $loansResult = mysqli_query($conn, $loansSql);
 
-$loansResult = mysqli_query($conn, $loansSql);
+// Get all members
+$membersSql = "SELECT member_id, fname, lname, email, phone, role FROM Member ORDER BY member_id";
+$membersResult = mysqli_query($conn, $membersSql);
+?>
 ?>
 
 <!DOCTYPE html>
@@ -162,15 +147,14 @@ $loansResult = mysqli_query($conn, $loansSql);
         <div class="tab-content" id="myTabContent">
             
             
-            <!-- TAB 1: DASHBOARD -->
-            <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
+    <!-- DASHBOARD TAB -->
+        <div class="tab-pane fade show active" id="dashboard">
+                <div class="row">
                     <div class="col-md-3 mb-3">
                         <div class="card stat-card" style="border-left-color: #667eea;">
                             <div class="card-body">
                                 <h6 class="text-muted">Total Books</h6>
-                                <h3 class="mb-0">TBD</h3>
+                                <h3><?= $countBooks ?></h3>
                             </div>
                         </div>
                     </div>
@@ -178,8 +162,7 @@ $loansResult = mysqli_query($conn, $loansSql);
                         <div class="card stat-card" style="border-left-color: #20c997;">
                             <div class="card-body">
                                 <h6 class="text-muted">Total Members</h6>
-                                <h3 class="mb-0">TBD</h3>
-
+                                <h3><?= $countMembers ?></h3>
                             </div>
                         </div>
                     </div>
@@ -187,7 +170,7 @@ $loansResult = mysqli_query($conn, $loansSql);
                         <div class="card stat-card" style="border-left-color: #ffc107;">
                             <div class="card-body">
                                 <h6 class="text-muted">Active Loans</h6>
-                                <h3 class="mb-0">TBD</h3>
+                                <h3><?= $countActiveLoans ?></h3>
                             </div>
                         </div>
                     </div>
@@ -195,7 +178,7 @@ $loansResult = mysqli_query($conn, $loansSql);
                         <div class="card stat-card" style="border-left-color: #dc3545;">
                             <div class="card-body">
                                 <h6 class="text-muted">Overdue Loans</h6>
-                                <h3 class="mb-0">TBD</h3>
+                                <h3><?= $countOverdue ?></h3>
                             </div>
                         </div>
                     </div>

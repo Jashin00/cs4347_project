@@ -24,7 +24,7 @@ phone VARCHAR(20)
 );
 -- Book Table
 CREATE TABLE Book (
-book_id INT PRIMARY KEY,
+book_id INT PRIMARY KEY AUTO_INCREMENT,
 title VARCHAR(80) NOT NULL,
 isbn  VARCHAR(20) NOT NULL UNIQUE,
 genre VARCHAR(40),
@@ -35,11 +35,11 @@ FOREIGN KEY (p_name)
 REFERENCES Publisher(p_name)
 ON UPDATE CASCADE
 ON DELETE RESTRICT
-);
+)AUTO_INCREMENT = 1000;
 
 -- Loan Table
 CREATE TABLE Loan (
-loan_id INT PRIMARY KEY,
+loan_id INT PRIMARY KEY AUTO_INCREMENT,
 member_id INT NOT NULL,
 date_out DATE NOT NULL,
 due_date DATE NOT NULL,
@@ -50,7 +50,7 @@ FOREIGN KEY (member_id)
 REFERENCES Member(member_id)
 ON UPDATE CASCADE
 ON DELETE RESTRICT
-);
+)AUTO_INCREMENT = 2000;
 -- LoanItem Table
 CREATE TABLE LoanItem (
 loan_id INT,

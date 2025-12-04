@@ -1,3 +1,24 @@
+<?php
+require_once 'config.php';
+
+// Get all books with authors and publisher
+$booksSql = "
+    SELECT 
+        b.book_id,
+        b.title,
+        b.isbn,
+        b.genre,
+        b.publication_date,
+        p.p_name AS publisher,
+        GROUP_CONCAT(a.a_name SEPARATOR ', ') AS authors
+    FROM Book b
+    JOIN Publisher p ON b.p_name = p.p_name
+    LEFT JOIN Author a ON a.book_id = b.book_id
+    GROUP BY b.book_id
+    ORDER BY b.title
+";
+$booksResult = mysqli_query($conn, $booksSql);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,37 +34,12 @@
         .navbar {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .search-card {
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        }
-        .book-card {
-            border-left: 4px solid #667eea;
-            transition: all 0.3s;
+        .card {
             border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .book-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        .book-cover {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 180px;
-            border-radius: 8px;
-            font-size: 3rem;
-        }
-        .badge-status {
-            padding: 0.5em 1em;
-            font-size: 0.85rem;
-        }
-        .filter-section {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
+        .table-hover tbody tr:hover {
+            background-color: rgba(102, 126, 234, 0.1);
         }
     </style>
 </head>
@@ -72,161 +68,89 @@
     </nav>
 
     <div class="container my-5">
-        <h2 class="mb-4">Search Books</h2>
+        <h2 class="mb-4">Available Books</h2>
         
-        <!-- Search Section -->
-        <div class="card search-card mb-4">
-            <div class="card-body p-4">
-                <form id="searchForm" onsubmit="performSearch(); return false;">
-                    <div class="row">
-                        <div class="col-md-9 mb-3">
-                            <div class="input-group input-group-lg">
-                                <span class="input-group-text">🔍</span>
-                                <input type="text" class="form-control" id="searchQuery" 
-                                       placeholder="Search by title, author, or ISBN...">
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <button type="submit" class="btn btn-primary btn-lg w-100">Search</button>
-                        </div>
+        <!-- Search Bar -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-10">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by title, author, ISBN, or genre..." onkeyup="searchTable()">
                     </div>
-
-        <!-- Search Results -->
-        <div id="searchResults">
-            <!-- Book 1 -->
-            <div class="card book-card mb-4 shadow-sm">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="book-cover">📖</div>
-                        </div>
-                        <div class="col-md-8">
-                            <h5 class="card-title fw-bold mb-2">The Great Adventure</h5>
-                            <p class="text-muted mb-2">by <strong>John Author</strong></p>
-                            <p class="mb-2"><small><strong>ISBN:</strong> 978-0-123456-78-9</small></p>
-                            <p class="mb-2"><small><strong>Genre:</strong> Fiction | <strong>Year:</strong> 2023 | <strong>Version:</strong> Hardcover</small></p>
-                            <p class="text-muted mb-0">
-                                An epic tale of courage and discovery. Follow the protagonist through uncharted territories 
-                                as they face challenges that test their limits and transform their understanding of the world.
-                            </p>
-                        </div>
-                        <div class="col-md-2 d-flex flex-column justify-content-center align-items-center">
-                            <span class="badge bg-success badge-status mb-2">Available</span>
-                            <p class="mb-2 text-center"><small>3 copies</small></p>
-                            <button class="btn btn-primary btn-sm w-100 mb-2" onclick="borrowBook('The Great Adventure')">
-                                Borrow
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="showDetails('The Great Adventure')">
-                                Details
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Book 2 -->
-            <div class="card book-card mb-4 shadow-sm">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="book-cover">🔍</div>
-                        </div>
-                        <div class="col-md-8">
-                            <h5 class="card-title fw-bold mb-2">Mystery at Midnight</h5>
-                            <p class="text-muted mb-2">by <strong>Jane Mystery</strong></p>
-                            <p class="mb-2"><small><strong>ISBN:</strong> 978-0-987654-32-1</small></p>
-                            <p class="mb-2"><small><strong>Genre:</strong> Mystery | <strong>Year:</strong> 2024 | <strong>Version:</strong> Paperback</small></p>
-                            <p class="text-muted mb-0">
-                                A thrilling mystery that will keep you guessing until the very last page. Detective Sarah Chen 
-                                must solve a series of puzzling crimes before midnight strikes.
-                            </p>
-                        </div>
-                        <div class="col-md-2 d-flex flex-column justify-content-center align-items-center">
-                            <span class="badge bg-warning text-dark badge-status mb-2">Checked Out</span>
-                            <p class="mb-2 text-center"><small>0 available</small></p>
-                            <button class="btn btn-secondary btn-sm w-100 mb-2" disabled>
-                                Unavailable
-                            </button>
-                            <button class="btn btn-outline-primary btn-sm w-100" onclick="placeHold('Mystery at Midnight')">
-                                Place Hold
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Book 3 -->
-            <div class="card book-card mb-4 shadow-sm">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="book-cover">🚀</div>
-                        </div>
-                        <div class="col-md-8">
-                            <h5 class="card-title fw-bold mb-2">Space Odyssey 2099</h5>
-                            <p class="text-muted mb-2">by <strong>Robert Sci-Fi</strong></p>
-                            <p class="mb-2"><small><strong>ISBN:</strong> 978-0-456789-01-2</small></p>
-                            <p class="mb-2"><small><strong>Genre:</strong> Sci-Fi | <strong>Year:</strong> 2023 | <strong>Version:</strong> Audiobook</small></p>
-                            <p class="text-muted mb-0">
-                                Journey to the edges of the galaxy in this breathtaking science fiction epic. 
-                                Humanity's fate hangs in the balance as they encounter alien civilizations.
-                            </p>
-                        </div>
-                        <div class="col-md-2 d-flex flex-column justify-content-center align-items-center">
-                            <span class="badge bg-success badge-status mb-2">Available</span>
-                            <p class="mb-2 text-center"><small>5 copies</small></p>
-                            <button class="btn btn-primary btn-sm w-100 mb-2" onclick="borrowBook('Space Odyssey 2099')">
-                                Borrow
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="showDetails('Space Odyssey 2099')">
-                                Details
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Book 4 -->
-            <div class="card book-card mb-4 shadow-sm">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="book-cover">📚</div>
-                        </div>
-                        <div class="col-md-8">
-                            <h5 class="card-title fw-bold mb-2">Introduction to Database Systems</h5>
-                            <p class="text-muted mb-2">by <strong>Dr. Database Expert</strong></p>
-                            <p class="mb-2"><small><strong>ISBN:</strong> 978-0-111222-33-4</small></p>
-                            <p class="mb-2"><small><strong>Genre:</strong> Non-Fiction | <strong>Year:</strong> 2024 | <strong>Version:</strong> Hardcover</small></p>
-                            <p class="text-muted mb-0">
-                                A comprehensive guide to modern database systems. Perfect for students and professionals 
-                                learning about relational databases, SQL, and data management.
-                            </p>
-                        </div>
-                        <div class="col-md-2 d-flex flex-column justify-content-center align-items-center">
-                            <span class="badge bg-success badge-status mb-2">Available</span>
-                            <p class="mb-2 text-center"><small>8 copies</small></p>
-                            <button class="btn btn-primary btn-sm w-100 mb-2" onclick="borrowBook('Introduction to Database Systems')">
-                                Borrow
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="showDetails('Introduction to Database Systems')">
-                                Details
-                            </button>
-                        </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100" onclick="searchTable()">Search</button>
                     </div>
                 </div>
             </div>
         </div>
 
-
-        <!-- Search Results -->
-
-
-
+        <!-- Books Table -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Book Catalog</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="booksTable">
+                        <thead>
+                            <tr>
+                                <th>ISBN</th>
+                                <th>Title</th>
+                                <th>Author(s)</th>
+                                <th>Genre</th>
+                                <th>Publisher</th>
+                                <th>Publication Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!$booksResult || mysqli_num_rows($booksResult) === 0): ?>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No books found.</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php while ($book = mysqli_fetch_assoc($booksResult)): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($book['isbn']) ?></td>
+                                        <td><strong><?= htmlspecialchars($book['title']) ?></strong></td>
+                                        <td><?= htmlspecialchars($book['authors'] ?: 'N/A') ?></td>
+                                        <td><?= htmlspecialchars($book['genre'] ?: 'N/A') ?></td>
+                                        <td><?= htmlspecialchars($book['publisher']) ?></td>
+                                        <td><?= htmlspecialchars($book['publication_date']) ?></td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+    <script>
+        function searchTable() {
+            var input = document.getElementById('searchInput');
+            var filter = input.value.toLowerCase();
+            var table = document.getElementById('booksTable');
+            var tr = table.getElementsByTagName('tr');
+
+            for (var i = 1; i < tr.length; i++) {
+                var td = tr[i].getElementsByTagName('td');
+                var found = false;
+                
+                for (var j = 0; j < td.length; j++) {
+                    if (td[j]) {
+                        var txtValue = td[j].textContent || td[j].innerText;
+                        if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                
+                tr[i].style.display = found ? '' : 'none';
+            }
+        }
+    </script>
 </body>
 </html>
