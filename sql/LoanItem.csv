@@ -1,4 +1,4 @@
-LoanItem.csv
+loan_id,book_id,quantity
 9001,101,1
 9002,193,1
 9003,234,1

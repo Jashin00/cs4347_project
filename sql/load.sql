@@ -8,7 +8,7 @@ INTO TABLE Book
 FIELDS TERMINATED BY ',' ENCLOSED BY '"'
 LINES TERMINATED BY '\r\n'
 IGNORE 1 ROWS
-(book_id,title, isbn, genre, publication_date, p_name);
+(book_id,title, isbn, genre, publication_date, p_name,status);
 LOAD DATA  INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/Author.csv'
 INTO TABLE Author
 FIELDS TERMINATED BY ',' ENCLOSED BY '"'
