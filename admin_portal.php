@@ -749,7 +749,7 @@ $membersResult = mysqli_query($conn, $membersSql);
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="book_search.html">Search Books</a>
+                        <a class="nav-link" href="book_search.php">Search Books</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link active" href="member_dashboard.php">My Account</a>
