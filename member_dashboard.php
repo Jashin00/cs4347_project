@@ -1,20 +1,73 @@
 <?php
 // Member Dashboard – dynamic version
-
+session_start();
 require 'config.php';
 
-// 
-// if (!is_logged_in()) {
-//     redirect('index.php');
-// }
 
+// make sure the user is logged in
+if (empty($_SESSION['member_id'])) {
+    header("Location: index.php");
+    exit();
+}
 
-$memberId = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+$memberId = (int)$_SESSION['member_id'];
 
-if ($memberId <= 0) {
-    $res = mysqli_query($conn, "SELECT member_id FROM Member ORDER BY member_id LIMIT 1");
-    if ($row = mysqli_fetch_assoc($res)) {
-        $memberId = intval($row['member_id']);
+$profile_success = '';
+$profile_error   = '';
+
+// Handle profile update
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && ($_POST['action'] ?? '') === 'update_profile') {
+
+    $fname   = trim($_POST['fname']   ?? '');
+    $lname   = trim($_POST['lname']   ?? '');
+    $email   = trim($_POST['email']   ?? '');
+    $phone   = trim($_POST['phone']   ?? '');
+    $address = trim($_POST['address'] ?? '');
+    $dob     = trim($_POST['dob']     ?? '');
+
+    if ($fname === '' || $lname === '' || $email === '' || $phone === '') {
+        $profile_error = 'First name, last name, email, and phone are required.';
+    } else {
+        // Empty DOB → NULL
+        $dobParam = $dob === '' ? null : $dob;
+
+        $sql = "
+            UPDATE Member
+            SET fname = ?, lname = ?, email = ?, phone = ?, address = ?, dob = ?
+            WHERE member_id = ?
+        ";
+        $stmt = mysqli_prepare($conn, $sql);
+        if ($stmt) {
+            mysqli_stmt_bind_param(
+                $stmt,
+                'ssssssi',
+                $fname,
+                $lname,
+                $email,
+                $phone,
+                $address,
+                $dobParam,
+                $memberId
+            );
+            if (mysqli_stmt_execute($stmt)) {
+                $profile_success = 'Profile updated successfully.';
+
+                // keep session in sync
+                $_SESSION['fname'] = $fname;
+                $_SESSION['lname'] = $lname;
+                $_SESSION['email'] = $email;
+            } else {
+                if (mysqli_errno($conn) == 1062) {
+                    $profile_error = 'Email or phone already in use.';
+                } else {
+                    $profile_error = 'Error updating profile: ' . mysqli_error($conn);
+                }
+            }
+            mysqli_stmt_close($stmt);
+        } else {
+            $profile_error = 'Database error: ' . mysqli_error($conn);
+        }
     }
 }
 
@@ -155,6 +208,18 @@ if ($member) {
     </nav>
 
     <div class="container my-5">
+    <?php if ($profile_success): ?>
+        <div class="alert alert-success">
+            <?= htmlspecialchars($profile_success) ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($profile_error): ?>
+        <div class="alert alert-danger">
+            <?= htmlspecialchars($profile_error) ?>
+        </div>
+    <?php endif; ?>
+
         <h2 class="mb-4">My Account</h2>
 
         <div class="row">
@@ -252,11 +317,7 @@ if ($member) {
                                 </tbody>
                             </table>
                         </div>
-                        <div class="text-center mt-3">
-                            <button class="btn btn-outline-secondary" onclick="alert('Full history feature coming soon!')">
-                                View Full History
-                            </button>
-                        </div>
+                       
                     </div>
                 </div>
             </div>
@@ -272,45 +333,72 @@ if ($member) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editProfileForm">
+                    <form method="post" action="member_dashboard.php">
+                        <input type="hidden" name="action" value="update_profile">
+
                         <div class="mb-3">
-                            <label for="editName" class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="editName"
-                                   value="<?php echo $member ? htmlspecialchars($member['fname'] . ' ' . $member['lname']) : ''; ?>">
+                            <label class="form-label">First Name</label>
+                            <input type="text"
+                                class="form-control"
+                                name="fname"
+                                value="<?= $member ? htmlspecialchars($member['fname']) : '' ?>"
+                                required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="editEmail" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="editEmail"
-                                   value="<?php echo $member ? htmlspecialchars($member['email']) : ''; ?>">
+                            <label class="form-label">Last Name</label>
+                            <input type="text"
+                                class="form-control"
+                                name="lname"
+                                value="<?= $member ? htmlspecialchars($member['lname']) : '' ?>"
+                                required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="editPhone" class="form-label">Phone</label>
-                            <input type="tel" class="form-control" id="editPhone"
-                                   value="<?php echo $member ? htmlspecialchars($member['phone']) : ''; ?>">
+                            <label class="form-label">Email</label>
+                            <input type="email"
+                                class="form-control"
+                                name="email"
+                                value="<?= $member ? htmlspecialchars($member['email']) : '' ?>"
+                                required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="editAddress" class="form-label">Address</label>
-                            <textarea class="form-control" id="editAddress" rows="2"><?php
-                                echo $member ? htmlspecialchars($member['address']) : '';
-                            ?></textarea>
+                            <label class="form-label">Phone</label>
+                            <input type="tel"
+                                class="form-control"
+                                name="phone"
+                                value="<?= $member ? htmlspecialchars($member['phone']) : '' ?>"
+                                required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control"
+                                    name="address"
+                                    rows="2"><?= $member ? htmlspecialchars($member['address']) : '' ?></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date"
+                                class="form-control"
+                                name="dob"
+                                value="<?= $member && !empty($member['dob']) ? htmlspecialchars($member['dob']) : '' ?>">
+                        </div>
+
+                        <div class="modal-footer px-0">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
-                </div>
+
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function saveProfile() {
-            alert('Profile updated successfully! (demo only, not saving to DB yet)');
-            var modal = bootstrap.Modal.getInstance(document.getElementById('editProfileModal'));
-            modal.hide();
-        }
-    </script>
+
 </body>
 </html>

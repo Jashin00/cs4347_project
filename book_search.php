@@ -1,8 +1,9 @@
 <?php
 require_once 'config.php';
 
-// Get all books with authors and publisher
-$booksSql = "
+$searchTerm = trim($_GET['q'] ?? '');
+
+$baseSql = "
     SELECT 
         b.book_id,
         b.title,
@@ -10,15 +11,45 @@ $booksSql = "
         b.genre,
         b.publication_date,
         p.p_name AS publisher,
+        b.status,
         GROUP_CONCAT(a.a_name SEPARATOR ', ') AS authors
     FROM Book b
     JOIN Publisher p ON b.p_name = p.p_name
     LEFT JOIN Author a ON a.book_id = b.book_id
+    WHERE b.status IN ('AVAILABLE', 'ON_LOAN')
+";
+
+if ($searchTerm !== '') {
+    $baseSql .= "
+        AND (
+            b.title    LIKE ?
+            OR a.a_name  LIKE ?
+            OR b.isbn    LIKE ?
+            OR p.p_name  LIKE ?
+            OR b.genre   LIKE ?
+        )
+    ";
+}
+
+$baseSql .= "
     GROUP BY b.book_id
     ORDER BY b.title
 ";
-$booksResult = mysqli_query($conn, $booksSql);
+
+if ($searchTerm !== '') {
+    $stmt = mysqli_prepare($conn, $baseSql);
+    $like = '%' . $searchTerm . '%';
+    mysqli_stmt_bind_param($stmt, 'sssss', $like, $like, $like, $like, $like);
+    mysqli_stmt_execute($stmt);
+    $booksResult = mysqli_stmt_get_result($stmt);
+    mysqli_stmt_close($stmt);
+} else {
+    $booksResult = mysqli_query($conn, $baseSql);
+}
+
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,16 +104,27 @@ $booksResult = mysqli_query($conn, $booksSql);
         <!-- Search Bar -->
         <div class="card mb-4">
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-10">
-                        <input type="text" class="form-control" id="searchInput" placeholder="Search by title, author, ISBN, or genre..." onkeyup="searchTable()">
+                <form class="row g-2" method="get" action="book_search.php">
+                    <div class="col-md-8">
+                        <input type="text"
+                            class="form-control"
+                            id="searchInput"
+                            name="q"
+                            placeholder="Search by title, author, ISBN, publisher, or genre..."
+                            value="<?= htmlspecialchars($searchTerm) ?>">
                     </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-primary w-100" onclick="searchTable()">Search</button>
+                    <div class="col-md-2 d-grid">
+                        <button type="submit" class="btn btn-primary">Search</button>
                     </div>
-                </div>
+                    <div class="col-md-2 d-grid">
+                        <a href="book_search.php" class="btn btn-outline-secondary">Clear</a>
+                    </div>
+                </form>
             </div>
         </div>
+
+
+
 
         <!-- Books Table -->
         <div class="card">
@@ -100,12 +142,13 @@ $booksResult = mysqli_query($conn, $booksSql);
                                 <th>Genre</th>
                                 <th>Publisher</th>
                                 <th>Publication Date</th>
+                                <th>status</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (!$booksResult || mysqli_num_rows($booksResult) === 0): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted">No books found.</td>
+                                    <td colspan="7" class="text-center text-muted">No books found.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php while ($book = mysqli_fetch_assoc($booksResult)): ?>
@@ -116,10 +159,12 @@ $booksResult = mysqli_query($conn, $booksSql);
                                         <td><?= htmlspecialchars($book['genre'] ?: 'N/A') ?></td>
                                         <td><?= htmlspecialchars($book['publisher']) ?></td>
                                         <td><?= htmlspecialchars($book['publication_date']) ?></td>
+                                        <td><?= htmlspecialchars($book['status'] ?? '') ?></td>
                                     </tr>
                                 <?php endwhile; ?>
                             <?php endif; ?>
                         </tbody>
+
                     </table>
                 </div>
             </div>
@@ -128,29 +173,8 @@ $booksResult = mysqli_query($conn, $booksSql);
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function searchTable() {
-            var input = document.getElementById('searchInput');
-            var filter = input.value.toLowerCase();
-            var table = document.getElementById('booksTable');
-            var tr = table.getElementsByTagName('tr');
 
-            for (var i = 1; i < tr.length; i++) {
-                var td = tr[i].getElementsByTagName('td');
-                var found = false;
-                
-                for (var j = 0; j < td.length; j++) {
-                    if (td[j]) {
-                        var txtValue = td[j].textContent || td[j].innerText;
-                        if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                
-                tr[i].style.display = found ? '' : 'none';
-            }
-        }
+
     </script>
 </body>
 </html>

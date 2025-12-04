@@ -704,7 +704,7 @@ $membersResult = mysqli_query($conn, $membersSql);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Portal - Library Management System</title>
+    <title>Admin Portal - Library Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -742,7 +742,7 @@ $membersResult = mysqli_query($conn, $membersSql);
     <!-- Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">📚 Library Staff Portal</a>
+            <a class="navbar-brand fw-bold" href="#">📚 Library Admin Portal</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -752,7 +752,7 @@ $membersResult = mysqli_query($conn, $membersSql);
                         <a class="nav-link" href="book_search.html">Search Books</a>
                     </li>
                     <li class="nav-item">
-                        <span class="nav-link">👤 Staff: John Librarian</span>
+                        <a class="nav-link active" href="member_dashboard.php">My Account</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="index.php">Logout</a>
@@ -763,7 +763,7 @@ $membersResult = mysqli_query($conn, $membersSql);
     </nav>
 
     <div class="container-fluid my-4">
-        <h2 class="mb-4">Staff Portal</h2>
+        <h2 class="mb-4">Admin Portal</h2>
         <?php if (!empty($success_message)): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <?= htmlspecialchars($success_message) ?>
@@ -1135,13 +1135,13 @@ $membersResult = mysqli_query($conn, $membersSql);
                     <div class="col-md-12">
                         <div class="card">
                             <div class="card-header bg-success text-white">
-                                <h5 class="mb-0">Active Loans</h5>
+                                <h5 class="mb-0">All Loans</h5>
                             </div>
                             <div class="card-body">
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
-                                            
+                                            <th>Loan ID</th>
                                             <th>Member</th>
                                             <th>Book</th>
                                             <th>Loan Date</th>
@@ -1160,6 +1160,7 @@ $membersResult = mysqli_query($conn, $membersSql);
                                                     $statusClass = $isReturned ? 'success'  : 'warning';
                                                 ?>
                                                 <tr>
+                                                    <td><?= htmlspecialchars($loan['loan_id']) ?></td>
                                                     <td><?= htmlspecialchars($loan['member_name']) ?></td>
                                                     <td><?= htmlspecialchars($loan['books'] ?: 'N/A') ?></td>
                                                     <td><?= htmlspecialchars($loan['date_out']) ?></td>
