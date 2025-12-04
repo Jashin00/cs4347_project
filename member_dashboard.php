@@ -15,6 +15,24 @@ $memberId = (int)$_SESSION['member_id'];
 $profile_success = '';
 $profile_error   = '';
 
+function calculate_fine($date_out, $return_date = null) {
+    $loan_days = 14;
+    $rate = 1;
+
+    $end_date = $return_date ?? date('Y-m-d');
+
+    $start = new DateTime($date_out);
+    $end   = new DateTime($end_date);
+
+    $days_used = $start->diff($end)->days;
+
+    if ($days_used <= $loan_days) {
+        return 0;
+    }
+
+    return ($days_used - $loan_days) * $rate;
+}
+
 // Handle profile update
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && ($_POST['action'] ?? '') === 'update_profile') {
@@ -116,6 +134,10 @@ if ($memberId > 0) {
         } elseif ($due && $today > $due) {
             $status = "Overdue";
         }
+
+        $fine = calculate_fine($row['date_out'], $row['return_date']);
+        $row['fine'] = $fine;
+
 
         $row['status'] = $status;
         $history[] = $row;
@@ -285,6 +307,7 @@ if ($member) {
                                         <th>Borrowed</th>
                                         <th>Returned</th>
                                         <th>Status</th>
+                                        <th>Fine</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -310,7 +333,10 @@ if ($member) {
                                                     <span class="badge <?php echo $badgeClass; ?>">
                                                         <?php echo htmlspecialchars($h['status']); ?>
                                                     </span>
-                                                </td>
+                                               </td>
+                                                   <td>
+                                                       $<?php echo number_format($h['fine'], 2); ?>
+                                                   </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
