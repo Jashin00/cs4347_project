@@ -1,3 +1,82 @@
+<?php
+// Member Dashboard – dynamic version
+
+require 'config.php';
+
+// 
+// if (!is_logged_in()) {
+//     redirect('index.php');
+// }
+
+
+$memberId = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+
+if ($memberId <= 0) {
+    $res = mysqli_query($conn, "SELECT member_id FROM Member ORDER BY member_id LIMIT 1");
+    if ($row = mysqli_fetch_assoc($res)) {
+        $memberId = intval($row['member_id']);
+    }
+}
+
+$member = null;
+if ($memberId > 0) {
+    $stmt = mysqli_prepare($conn, "
+        SELECT member_id, fname, lname, dob, address, phone, email
+        FROM Member
+        WHERE member_id = ?
+    ");
+    mysqli_stmt_bind_param($stmt, "i", $memberId);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $member = mysqli_fetch_assoc($result);
+    mysqli_stmt_close($stmt);
+}
+
+$history = [];
+if ($memberId > 0) {
+    $stmt = mysqli_prepare($conn, "
+        SELECT
+            b.title AS book_title,
+            a.a_name AS author,
+            l.date_out,
+            l.due_date,
+            l.return_date
+        FROM Loan l
+        JOIN LoanItem li ON l.loan_id = li.loan_id
+        JOIN Book b ON li.book_id = b.book_id
+        LEFT JOIN Author a ON a.book_id = b.book_id
+        WHERE l.member_id = ?
+        ORDER BY l.date_out DESC
+        LIMIT 10
+    ");
+    mysqli_stmt_bind_param($stmt, "i", $memberId);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $status = "On Loan";
+        $today = new DateTime();
+        $due = !empty($row['due_date']) ? new DateTime($row['due_date']) : null;
+
+        if (!empty($row['return_date'])) {
+            $status = "Returned";
+        } elseif ($due && $today > $due) {
+            $status = "Overdue";
+        }
+
+        $row['status'] = $status;
+        $history[] = $row;
+    }
+    mysqli_stmt_close($stmt);
+}
+
+$initials = "MB";
+if ($member) {
+    $first = strtoupper(substr($member['fname'], 0, 1));
+    $last  = strtoupper(substr($member['lname'], 0, 1));
+    $initials = $first . $last;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,36 +156,56 @@
 
     <div class="container my-5">
         <h2 class="mb-4">My Account</h2>
-        
+
         <div class="row">
             <!-- Left Column - Profile Info -->
             <div class="col-md-4 mb-4">
                 <!-- Profile Card -->
                 <div class="card shadow-sm">
                     <div class="card-body text-center py-4">
-                        <div class="profile-avatar mb-3">JD</div>
-                        <h5 class="mb-1">John Doe</h5>
-                        <p class="text-muted mb-2">Member ID: #M12345</p>
-                        <p class="mb-1"><small>📧 john.doe@email.com</small></p>
-                        <p class="mb-3"><small>📞 (123) 456-7890</small></p>
+                        <div class="profile-avatar mb-3">
+                            <?php echo htmlspecialchars($initials); ?>
+                        </div>
+
+                        <?php if ($member): ?>
+                            <h5 class="mb-1">
+                                <?php echo htmlspecialchars($member['fname'] . ' ' . $member['lname']); ?>
+                            </h5>
+                            <p class="text-muted mb-2">
+                                Member ID: #<?php echo htmlspecialchars($member['member_id']); ?>
+                            </p>
+                            <p class="mb-1">
+                                <small>📧 <?php echo htmlspecialchars($member['email']); ?></small>
+                            </p>
+                            <p class="mb-1">
+                                <small>📞 <?php echo htmlspecialchars($member['phone']); ?></small>
+                            </p>
+                            <?php if (!empty($member['address'])): ?>
+                                <p class="mb-1">
+                                    <small>🏠 <?php echo htmlspecialchars($member['address']); ?></small>
+                                </p>
+                            <?php endif; ?>
+                            <?php if (!empty($member['dob'])): ?>
+                                <p class="mb-3">
+                                    <small>🎂 <?php echo htmlspecialchars($member['dob']); ?></small>
+                                </p>
+                            <?php else: ?>
+                                <p class="mb-3"></p>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <h5 class="mb-1">Unknown Member</h5>
+                            <p class="text-muted mb-3">No member information found.</p>
+                        <?php endif; ?>
+
                         <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProfileModal">
                             Edit Profile
                         </button>
                     </div>
                 </div>
-                
-               
-
-
             </div>
-            
-            <!-- Right Column - Current Books & History -->
+
+            <!-- Right Column - Borrowing History -->
             <div class="col-md-8">
-               
-
-                
-
-                <!-- Borrowing History -->
                 <div class="card shadow-sm">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">Recent Borrowing History</h5>
@@ -124,34 +223,32 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td>Historical Fiction Novel</td>
-                                        <td>History Writer</td>
-                                        <td>Oct 1, 2024</td>
-                                        <td>Oct 14, 2024</td>
-                                        <td><span class="badge bg-success">Returned</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Romance Story</td>
-                                        <td>Love Author</td>
-                                        <td>Sep 15, 2024</td>
-                                        <td>Sep 29, 2024</td>
-                                        <td><span class="badge bg-success">Returned</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Thriller Book</td>
-                                        <td>Suspense Writer</td>
-                                        <td>Aug 20, 2024</td>
-                                        <td>Sep 5, 2024</td>
-                                        <td><span class="badge bg-success">Returned</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Fantasy Epic</td>
-                                        <td>Fantasy Author</td>
-                                        <td>Jul 10, 2024</td>
-                                        <td>Jul 28, 2024</td>
-                                        <td><span class="badge bg-success">Returned</span></td>
-                                    </tr>
+                                    <?php if (count($history) === 0): ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center">
+                                                No borrowing history found.
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($history as $h): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($h['book_title']); ?></td>
+                                                <td><?php echo htmlspecialchars($h['author'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($h['date_out']); ?></td>
+                                                <td><?php echo htmlspecialchars($h['return_date'] ?? '-'); ?></td>
+                                                <td>
+                                                    <?php
+                                                    $badgeClass = 'bg-primary';
+                                                    if ($h['status'] === 'Returned') $badgeClass = 'bg-success';
+                                                    if ($h['status'] === 'Overdue')  $badgeClass = 'bg-danger';
+                                                    ?>
+                                                    <span class="badge <?php echo $badgeClass; ?>">
+                                                        <?php echo htmlspecialchars($h['status']); ?>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -178,19 +275,24 @@
                     <form id="editProfileForm">
                         <div class="mb-3">
                             <label for="editName" class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="editName" value="John Doe">
+                            <input type="text" class="form-control" id="editName"
+                                   value="<?php echo $member ? htmlspecialchars($member['fname'] . ' ' . $member['lname']) : ''; ?>">
                         </div>
                         <div class="mb-3">
                             <label for="editEmail" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="editEmail" value="john.doe@email.com">
+                            <input type="email" class="form-control" id="editEmail"
+                                   value="<?php echo $member ? htmlspecialchars($member['email']) : ''; ?>">
                         </div>
                         <div class="mb-3">
                             <label for="editPhone" class="form-label">Phone</label>
-                            <input type="tel" class="form-control" id="editPhone" value="(123) 456-7890">
+                            <input type="tel" class="form-control" id="editPhone"
+                                   value="<?php echo $member ? htmlspecialchars($member['phone']) : ''; ?>">
                         </div>
                         <div class="mb-3">
                             <label for="editAddress" class="form-label">Address</label>
-                            <textarea class="form-control" id="editAddress" rows="2">123 Main St, City, State 12345</textarea>
+                            <textarea class="form-control" id="editAddress" rows="2"><?php
+                                echo $member ? htmlspecialchars($member['address']) : '';
+                            ?></textarea>
                         </div>
                     </form>
                 </div>
@@ -205,7 +307,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function saveProfile() {
-            alert('Profile updated successfully!');
+            alert('Profile updated successfully! (demo only, not saving to DB yet)');
             var modal = bootstrap.Modal.getInstance(document.getElementById('editProfileModal'));
             modal.hide();
         }
